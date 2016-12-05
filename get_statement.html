@@ -1,0 +1,128 @@
+<!doctype html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+  <title>xAPI sample page</title>
+  <meta name="description" content="">
+  <meta name="author" content="">
+  
+  <style>
+	table, th, td {
+    	border: 1px solid black;
+    	border-collapse: collapse;
+	}
+</style>
+
+	<script type="text/javascript" src="./js/cryptojs_v3.1.2.js"></script>
+	<script type="text/javascript" src="./js/verbs.js"></script>
+	<script type="text/javascript" src="./js/xapistatement.js"></script>
+	<script type="text/javascript" src="./js/xapiwrapper.js"></script>
+	<!------------------------------------->
+
+<script>
+	function config_LRS(){
+var conf = {
+    			"endpoint" : "https://cloud.scorm.com/tc/V8673G41ZV/sandbox/",
+    			"auth" : "Basic " + toBase64('LwE-5UC3HybN3P4eHvI:yGFIyA75P0hwzZmbcfA'),
+  			};
+
+		  ADL.XAPIWrapper.changeConfig(conf);
+	}
+						
+						
+						
+	function get_statements(){
+		config_LRS();
+
+//	Start by getting the list of statements for those who answered the quiz question
+//	First, we set the parameters for the query:
+		var quizParams = ADL.XAPIWrapper.searchParams()
+		quizParams['verb'] = "http://adlnet.gov/expapi/verbs/answered";
+		quizParams['activity'] = "http://omnesLRS.com/xapi/quiz_tracker";
+
+//	Now, issue the query
+ 		var ret = ADL.XAPIWrapper.getStatements(quizParams);
+ 			console.log("answered list: ");
+ 			console.log (ret);
+ 			var txt = " ";
+ 			if (ret) {
+// walk through the list of "answer" statements to see what we have
+ 			for (i = 0; i < ret.statements.length; i++) {				
+ 				var studentName = ret.statements[i].actor.mbox;
+				var studentAnswer = ret.statements[i].result.response;
+				var studentTS = ret.statements[i].timestamp + "<br>";	
+				var answerLocation = ret.statements[i].result.extensions["http://example.com/xapi/location"];
+
+//	When we find a statement for someone who answered the question, search for statements
+//  for when/if that user played the video
+//	Set the parameters for the query for "Play"				
+				var vidParams = ADL.XAPIWrapper.searchParams()
+				vidParams['agent'] = '{"mbox":"' + studentName + '"}"';
+				vidParams['verb'] = "http://adlnet.gov/expapi/verbs/Play";
+						// Make sure you pay attention the CASE OF THE VERB!!!!!!!!!
+
+				vidParams['activity'] = "http://example.com/bigbuckbunnyvid.html";
+//	Send the query for statements where the student played this video
+				var vidRet = ADL.XAPIWrapper.getStatements(vidParams);
+				var vidWatched = false;
+//	Now walk through the Play statements
+				for (x = 0; x < vidRet.statements.length; x++) {
+						if (!(vidWatched)) 
+// Look to see if the user played the relevant segment of the video
+						if (answerLocation > vidRet.statements[x].result.extensions["http://example.com/xapi/period_start"])
+							{
+							if (answerLocation < vidRet.statements[x].result.extensions["http://example.com/xapi/period_end"])
+								{
+								vidWatched = true;
+								console.log ("vidWatched = true");
+								}
+								else { vidWatched = false;
+									console.log ("vidWatched = " );
+								} 
+							}
+							else { var vidWatched = false;
+									console.log ("vidWatched = " );
+								}	
+				}
+				var table = document.getElementById("result_table");
+				var row = table.insertRow(i + 1);
+    			var cell0 = row.insertCell(0);
+    			cell0.innerHTML = i;
+    			var cell1 = row.insertCell(1);
+    			cell1.innerHTML = studentName;
+    			var cell2 = row.insertCell(2);
+    			cell2.innerHTML = studentAnswer;
+    			var cell3 = row.insertCell(3);
+    			cell3.innerHTML = vidWatched;
+    										
+			}
+		}
+	}
+
+</script>
+
+</head>
+
+
+
+<body>
+<button type="button" onclick="get_statements()">Get Statements</button>
+<br/><br/><br/>
+<div id="results">
+	<table id="result_table" style="width:50%">
+  		<tr>
+    		<td> # </td> 
+    		<td><b>Student Name</b></td>
+    		<td><b>Student Answer</b></td>
+    		<td><b>Video Watched</b></td>
+  		</tr>
+
+	</table>
+</div>
+
+
+
+</body>
+
+</html>
