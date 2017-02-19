@@ -1,0 +1,228 @@
+<!doctype html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+  <title>xAPI sample page</title>
+  <meta name="description" content="">
+  <meta name="author" content="">
+
+	<!-- using jw player to serve the video -->
+	<!-- JW player can be downloaded from -->
+	<!-- http://www.jwplayer.com/pricing/ -->
+  	<script src="./js/jwplayer6/jwplayer.js"></script>  	
+  	
+  	<!-- The video used is Big Buck Bunny under Creative commons 3.0.  -->
+  	<!-- You can find the movie here: -->
+  	<!-- https://peach.blender.org/download/ -->
+  	
+  	<!-- Includes for ADL's xAPI Wrapper -->
+	<!-- Download the files from: -->
+	<!-- https://github.com/adlnet/xAPIWrapper -->
+	<script type="text/javascript" src="./js/cryptojs_v3.1.2.js"></script>
+	<script type="text/javascript" src="./js/verbs.js"></script>
+	<script type="text/javascript" src="./js/xapistatement.js"></script>
+	<script type="text/javascript" src="./js/xapiwrapper.js"></script>
+	<!------------------------------------->
+
+</head>
+
+
+<body>
+<div align="center">
+
+A quick example of using xAPI to track jwplayer events.
+ 
+ <br/><br/>
+
+</div>
+
+	<div align="center", id="original">
+	<div id="mediaplayer1">
+	<a href="http://www.macromedia.com/go/getflashplayer">Get the Flash Player</a> to see this player.</div>
+	
+		<script type="text/javascript">
+			playcount = 0;
+			var playFrom = 0;
+            var url = window.location.pathname;
+			var filename = url.substring(url.lastIndexOf('/')+1, url.lastIndexOf('.'));
+		  	jwplayer('mediaplayer1').setup({		  		
+				width: "480",
+      			aspectratio: "16:9",
+		    	file: "./big_buck_bunny.mp4",
+		    	autostart: false,
+		  	});
+// this adds the pop-up to ask for the user's name.  We'll build the ACTOR definition
+// with this first name		  			  	
+		  	var firstname = prompt("What is your first name?")
+		    	
+//  Tell the content where to send the xAPI statements
+			var conf = {
+    			"endpoint" : "https://cloud.scorm.com/tc/V8673G41ZV/sandbox/",
+    			"auth" : "Basic " + toBase64('LwE-5UC3HybN3P4eHvI:yGFIyA75P0hwzZmbcfA'),
+  			};
+  					
+							
+// 	We're not going to sent a statement on PLAY for this example.  Instead, we're going to set
+//	the variable for what point within the video the user started playing a given period			
+			jwplayer().onPlay(function(event){
+				playFrom = jwplayer().getPosition()
+				console.log("Video Played");
+
+			});
+			
+// Send statement when someone pauses the video
+		  	jwplayer().onPause(function(event){
+		  		var duration = jwplayer().getDuration()
+		  		var position = jwplayer().getPosition()
+				console.log("Pause Statement Submitted " + playFrom + "," + position);
+				ADL.XAPIWrapper.changeConfig(conf);
+				//define the xapi statement being sent
+				var pausestatement = {
+	"actor": {
+        "mbox": "mailto:" + firstname + "@devlearn16.com",
+        "name": firstname,
+        "objectType": "Agent"
+	},
+    "verb": {
+        "id": "http://adlnet.gov/expapi/verbs/Play",
+        "display": {
+            "en-US": "Video Played"
+        }
+    },
+    "object": {
+        "id": "http://example.com/bigbuckbunnyvid.html",
+        "definition": {
+            "name": {
+                "en-US": "Big Buck Bunny Video"
+            },
+            "description": {
+                "en-US": "sample description"
+            }
+        },
+        "objectType": "Activity"
+	},
+
+//	This section shows the SEGMENT that the video played.  This is why we don't send the statement 
+// 	on the actual PLAY of the video, but when play stops.  This way we can gather both the start and
+// 	stop points more easily
+	"result": {
+		"extensions":{
+			"http://example.com/xapi/period_start"  : playFrom,
+			"http://example.com/xapi/period_end"  	: position
+		}
+	},
+	"context": {
+       	"platform": navigator.userAgent
+    }
+	}; //  end statement definition	
+	//  Send the statement to the LRS
+        		var result = ADL.XAPIWrapper.sendStatement(pausestatement);
+       			
+			}); //end onPlay
+
+// 	Send statement when the video plays to the end point.  The user does NOT
+//	need to actually play the entire vid.  They can seek to the end, then let it play.			
+			jwplayer().onComplete(function(event){ 
+				console.log("Video Completed");
+				ADL.XAPIWrapper.changeConfig(conf);
+				//define the xapi statement being sent
+				var completestatement = {
+	"actor": {
+        "mbox": "mailto:" + firstname + "@devlearn16.com",
+        "name": firstname,
+        "objectType": "Agent"
+	},
+    "verb": {
+        "id": "http://adlnet.gov/expapi/verbs/Play",
+        "display": {
+            "en-US": "Video Played"
+        }
+    },
+    "object": {
+        "id": "http://example.com/bigbuckbunnyvid.html",
+        "definition": {
+            "name": {
+                "en-US": "Big Buck Bunny Video"
+            },
+            "description": {
+                "en-US": "sample description"
+            }
+        },
+        "objectType": "Activity"
+	},
+
+//	This section shows the SEGMENT that the video played.  This is why we don't send the statement 
+// 	on the actual PLAY of the video, but when play stops.  This way we can gather both the start and
+// 	stop points more easily
+	"result": {
+		"extension":{
+			"http://example.com/xapi/period" : playFrom + "," + position
+		}
+	},
+	"context": {
+        "platform": navigator.userAgent
+    }
+	};	//end statement definition
+	//  Send the statement to the LRS
+        		var result = ADL.XAPIWrapper.sendStatement(completestatement);
+       			console.log("Complete Statement Submitted");
+			});	
+			
+	// Send statement on video abandonment - user leaves the page, etc...
+			jwplayer().onIdle(function(event){
+				console.log("Video Stopped");
+				ADL.XAPIWrapper.changeConfig(conf);
+				//define the xapi statement being sent				
+				var stopstatement = {	
+	"actor": {
+        "mbox": "mailto:" + firstname + "@devlearn16.com",
+        "name": firstname,
+        "objectType": "Agent"
+	},
+    "verb": {
+        "id": "http://adlnet.gov/expapi/verbs/Play",
+        "display": {
+            "en-US": "Video Played"
+        }
+    },
+    "object": {
+        "id": "http://example.com/bigbuckbunnyvid.html",
+        "definition": {
+            "name": {
+                "en-US": "Big Buck Bunny Video"
+            },
+            "description": {
+                "en-US": "sample description"
+            }
+        },
+        "objectType": "Activity"
+	},
+	"result": {
+		"extension":{
+			"http://example.com/xapi/period" : playFrom + "," + position
+		}
+	},
+		"context": {
+        	"platform": navigator.userAgent
+    }
+	}; //end statement definition
+	//  Send the statement to the LRS
+        		var result = ADL.XAPIWrapper.sendStatement(stopstatement);
+       			console.log("Stop Statement Submitted");
+			});	
+			
+			jwplayer().onError(function(even){
+				console.log("Video Error" + event.message);
+			});	
+					  	
+		</script>
+		<br/> <br/>
+	</div>
+	
+	<!-- link to Bigbuckbunny.org for CC attribution -->
+	<p><a href="https://peach.blender.org/about/"><img class="alignnone size-full wp-image-450 alignleft" style="float: left;" title="cc-by" src="https://peach.blender.org/wp-content/uploads/cc-by.jpg" alt="" width="100" height="35" /></a></p>
+	
+
+</body>
+</html>
